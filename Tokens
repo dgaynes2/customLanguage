@@ -1,0 +1,43 @@
+class Token:
+    def __init__(self,type_,value):
+        self.type = type_
+        self.value = value
+
+    def __repr__(self):
+        return f"{self.type}:{self.value}"
+
+class FloatToken(Token):
+    def __init__(self,value,type_='FLT'):
+        super().__init__(type_,value)
+        self.subtype = 'NUM'
+
+class IntegerToken(Token):
+    def __init__(self,value,type_='INT'):
+        super().__init__(type_,value)
+        self.subtype = 'NUM'
+
+class ComparativeToken(Token):
+    def __init__(self,type_,value):
+        super().__init__(type_,value)
+        self.subtype = 'COMP'
+
+class BracketToken(Token):
+    def __init__(self,type_,value):
+        super().__init__(type_,value)
+        self.subtype = 'BRKT'
+
+class OperatorToken(Token):
+    def __init__(self,type_,value):
+        super().__init__(type_,value)
+        self.subtype = 'OP'
+
+class VariableToken(Token):
+    # variable names
+    def __init__(self, name, value, type_='VAR'):
+        super().__init__(type_, value)
+        self.name = name
+        self.value = value
+        self.type = type_
+
+    def __repr__(self):
+        return f"{self.name}:{self.value}"
