@@ -1,0 +1,129 @@
+from Lexer import Lexer
+import Tokens
+
+VARIABLES = {}
+
+class Parser:
+    def __init__(self,tokens):
+        self.tokens = tokens
+        self.index = -1
+        self.current_token = None
+        self.next()
+
+    def next(self):
+        self.index += 1
+        self.current_token = self.tokens[self.index] if self.index < len(self.tokens) else None
+
+    def apply_operation(self, result, op, operand):
+        # Apply binary operations based on the given operator
+        assert operand is not None, 'Operand cannot be None'
+        if type(operand) in [int,float]:
+            if op == 'ADD':
+                return result + operand
+            elif op == 'SUB':
+                return result - operand
+            elif op == 'MUL':
+                return result * operand
+            elif op == 'DIV': # /
+                if operand != 0:
+                    return result / operand
+                return 'Error: Divide by zero'
+            elif op == 'FLD': # //
+                if operand != 0:
+                    return result // operand
+                return 'Error: Divide by zero'
+            elif op == 'MOD': # %
+                if operand != 0:
+                    return result % operand
+                return 'Error: Divide by zero'
+            else:
+                return f'Error: Invalid operator {op}'
+        else:
+            return f'Error: Invalid operator {operand}'
+
+    def parse(self):
+        return self.parse_expression()
+
+    def parse_expression(self):
+        result = self.parse_term()
+
+        while self.current_token and self.current_token.type in {'ADD','SUB'}:
+            if self.current_token.type == 'ADD':
+                self.next()
+                result += self.parse_term()
+            elif self.current_token.type == 'SUB':
+                self.next()
+                result -= self.parse_term()
+            # comparatives
+        return result
+
+    def parse_term(self):
+        result = self.parse_exponent()
+
+        while self.current_token and self.current_token.type in {'MUL', 'DIV', 'FLD', 'MOD'}:
+            op = self.current_token.type
+            self.next()
+            operand = self.parse_exponent()
+            result = self.apply_operation(result,op,operand)
+        return result
+
+    def parse_exponent(self):
+        result = self.parse_factor()
+
+        while self.current_token and self.current_token.type == 'POW':
+            self.next()
+            factor = self.parse_factor()
+            if not isinstance(result, (int, float)) or not isinstance(factor, (int, float)):
+                return f"Error: Both base and exponent must be numeric values"
+            result **= factor
+
+        return result
+
+    def parse_factor(self):
+        token = self.current_token
+
+        token = self.current_token
+        if isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
+            self.next()
+            return float(token.value) if '.' in token.value else int(token.value)
+
+        elif isinstance(token, Tokens.BracketToken) and token.type == 'LP':
+            self.next()
+            result = self.parse_expression()
+            if self.current_token and self.current_token.type != 'RP':
+                return 'Error: Mismatched parentheses'
+            self.next()
+            return result
+        # variables
+        # keywords
+        # constants
+        # monos
+        # negative number?
+        else:
+            return f"Error: Unexpected token: {token}"
+
+def main():
+    run = True
+    while run:
+        line = input('> ')
+        if line.strip() == '':
+            continue
+        elif line.lower() in {'exit','quit'}:
+            run = False
+        elif line.strip().lower() == 'vardict':
+            print(VARIABLES)
+        elif line.lower().startswith('del'):
+            pass
+        else:
+            lexer = Lexer(line)
+            tokens = lexer.make_tokens()
+            parser = Parser(tokens)
+            result = parser.parse()
+            print(result)
+
+if __name__ == '__main__':
+    main()
+
+## 32850.399999999994 ##
+# print((10%3)*4**(35//4)/2+100.2-17.8)
+# (10///3)*4**(35//4)/2+100.2-17.8
