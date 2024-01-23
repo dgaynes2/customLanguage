@@ -42,7 +42,24 @@ class Parser:
             return f'Error: Invalid operator {operand}'
 
     def parse(self):
-        return self.parse_expression()
+        if self.current_token.type == 'KEY':
+            if self.current_token.value == 'set':
+                return self.parse_variables()
+        else:
+            return self.parse_expression()
+
+    def parse_variables(self):
+        self.next()
+        token = self.current_token # var
+        if token.type == 'VAR':
+            variable_name = token.value
+            self.next()
+            if self.current_token and self.current_token.value == 'is':
+                self.next()
+                VARIABLES[variable_name] = self.parse_expression()
+
+                return f"Variable {variable_name} = {VARIABLES[variable_name]}"
+        return f"Error: Invalid variable assignment or usage"
 
     def parse_expression(self):
         result = self.parse_term()
@@ -81,9 +98,14 @@ class Parser:
 
     def parse_factor(self):
         token = self.current_token
+        # get variable value
+        if token.type == 'VAR':
+            self.next()
+            if token.value in VARIABLES:
+                return VARIABLES[token.value]
+            return f"Error: no variable {token.value} found"
 
-        token = self.current_token
-        if isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
+        elif isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
             self.next()
             return float(token.value) if '.' in token.value else int(token.value)
 
@@ -94,7 +116,6 @@ class Parser:
                 return 'Error: Mismatched parentheses'
             self.next()
             return result
-        # variables
         # keywords
         # constants
         # monos
@@ -112,8 +133,23 @@ def main():
             run = False
         elif line.strip().lower() == 'vardict':
             print(VARIABLES)
+        elif line.lower().startswith('cleardict'):
+            VARIABLES.clear()
+            print('All variables deleted')
         elif line.lower().startswith('del'):
-            pass
+            lexer = Lexer(line[3:])
+            tokens = lexer.make_tokens()
+            if len(tokens) > 0:
+                if tokens[0].type == 'VAR':
+                    if tokens[0].value in VARIABLES:
+                        VARIABLES.pop(tokens[0].value)
+                        print(f'Variable "{tokens[0].value}" deleted')
+                    else:
+                        print(f'Variable "{tokens[0].value}" not found')
+                else:
+                    print(f'"{tokens[0].value}" is not a valid variable name')
+            else:
+                print('"del" must be followed by variable to be deleted')
         else:
             lexer = Lexer(line)
             tokens = lexer.make_tokens()
