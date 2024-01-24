@@ -1,10 +1,12 @@
 from Lexer import Lexer
 import Tokens
+import Errors
 
 VARIABLES = {}
 
 class Parser:
     def __init__(self,tokens):
+
         self.tokens = tokens
         self.index = -1
         self.current_token = None
@@ -27,19 +29,19 @@ class Parser:
             elif op == 'DIV': # /
                 if operand != 0:
                     return result / operand
-                return 'Error: Divide by zero'
+                return Errors.DivideByZeroError()
             elif op == 'FLD': # //
                 if operand != 0:
                     return result // operand
-                return 'Error: Divide by zero'
+                return Errors.DivideByZeroError()
             elif op == 'MOD': # %
                 if operand != 0:
                     return result % operand
-                return 'Error: Divide by zero'
+                return Errors.DivideByZeroError()
             else:
-                return f'Error: Invalid operator {op}'
+                return Errors.InvalidTextError('operator',op)
         else:
-            return f'Error: Invalid operator {operand}'
+            return Errors.InvalidTextError('operand',operand)
 
     def parse(self):
         if self.current_token.type == 'KEY':
@@ -57,9 +59,8 @@ class Parser:
             if self.current_token and self.current_token.value == 'is':
                 self.next()
                 VARIABLES[variable_name] = self.parse_expression()
-
-                return f"Variable {variable_name} = {VARIABLES[variable_name]}"
-        return f"Error: Invalid variable assignment or usage"
+                return Errors.SetVariableMessage(variable_name,VARIABLES[variable_name])
+        return Errors.InvalidVariableAssignmentError()
 
     def parse_expression(self):
         result = self.parse_term()
@@ -91,7 +92,7 @@ class Parser:
             self.next()
             factor = self.parse_factor()
             if not isinstance(result, (int, float)) or not isinstance(factor, (int, float)):
-                return f"Error: Both base and exponent must be numeric values"
+                return Errors.ExponentError()
             result **= factor
 
         return result
@@ -103,7 +104,7 @@ class Parser:
             self.next()
             if token.value in VARIABLES:
                 return VARIABLES[token.value]
-            return f"Error: no variable {token.value} found"
+            return Errors.InvalidVariableError(token.value)
 
         elif isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
             self.next()
@@ -113,15 +114,16 @@ class Parser:
             self.next()
             result = self.parse_expression()
             if self.current_token and self.current_token.type != 'RP':
-                return 'Error: Mismatched parentheses'
+                return Errors.MismatchedParenthesesError()
             self.next()
             return result
+
         # keywords
         # constants
         # monos
         # negative number?
         else:
-            return f"Error: Unexpected token: {token}"
+            return Errors.UnexpectedTokenError(token)
 
 def main():
     run = True
@@ -143,13 +145,13 @@ def main():
                 if tokens[0].type == 'VAR':
                     if tokens[0].value in VARIABLES:
                         VARIABLES.pop(tokens[0].value)
-                        print(f'Variable "{tokens[0].value}" deleted')
+                        print(Errors.VariableDeletedMessage(tokens[0].value))
                     else:
                         print(f'Variable "{tokens[0].value}" not found')
                 else:
-                    print(f'"{tokens[0].value}" is not a valid variable name')
+                    print(Errors.VariableNotFoundError(tokens[0].value))
             else:
-                print('"del" must be followed by variable to be deleted')
+                print(Errors.DelSyntaxError())
         else:
             lexer = Lexer(line)
             tokens = lexer.make_tokens()
@@ -163,3 +165,10 @@ if __name__ == '__main__':
 ## 32850.399999999994 ##
 # print((10%3)*4**(35//4)/2+100.2-17.8)
 # (10///3)*4**(35//4)/2+100.2-17.8
+
+# TODO: comparatives
+# TODO: print
+# TODO: negative numbers
+# TODO: if/then -> test [if][then]
+# TODO: errors
+# TODO: doesn't raise error when mismatched parentheses
