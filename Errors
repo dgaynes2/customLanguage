@@ -1,0 +1,69 @@
+class InvalidTextError:
+    def __init__(self, required, user_given):
+        self.required = required
+        self.user_given = user_given
+
+    def __repr__(self):
+        return f'Error: Invalid {self.required}: {self.user_given}'
+
+class UnexpectedTokenError:
+    def __init__(self,token_name):
+        self.token_name = token_name
+
+    def __repr__(self):
+        return f"Error: Unexpected token: '{self.token_name}'"
+
+##### MATH #####
+
+class DivideByZeroError:
+    def __repr__(self):
+        return 'Error: Attempted to divide by 0'
+
+class ExponentError:
+    def __repr__(self):
+        return f"Error: Both base and exponent must be numeric values"
+
+class MismatchedParenthesesError:
+    def __repr__(self):
+        return 'Error: Mismatched parentheses'
+
+##### VARIABLES #####
+
+class InvalidVariableError:
+    def __init__(self,var_name):
+        self.var_name = var_name
+
+    def __repr__(self):
+            return f"Error: no variable '{self.var_name}' found"
+
+class SetVariableMessage:
+    def __init__(self,var_name,var_value):
+        self.var_name = var_name
+        self.var_value = var_value
+
+    def __repr__(self):
+        return f"Variable '{self.var_name}' = {self.var_value}"
+
+class VariableDeletedMessage:
+    def __init__(self,var_name):
+        self.var_name = var_name
+
+    def __repr__(self):
+        return f'Variable "{self.var_name}" deleted'
+
+class VariableNotFoundError:
+    def __init__(self, var_name):
+        self.var_name = var_name
+
+    def __repr__(self):
+        return f'Error: "{self.var_name}" is not a valid variable name'
+
+class InvalidVariableAssignmentError:
+    def __repr__(self):
+        return f"Error: Invalid variable assignment or usage"
+
+##### OTHER #####
+
+class DelSyntaxError:
+    def __repr__(self):
+        return 'Error: "del" must be followed by variable to be deleted'
