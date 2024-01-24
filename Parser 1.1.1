@@ -12,9 +12,32 @@ class Parser:
         self.current_token = None
         self.next()
 
+        self.parentheses_tracker = 0
+        # self.parentheses_counter()
+
     def next(self):
         self.index += 1
         self.current_token = self.tokens[self.index] if self.index < len(self.tokens) else None
+
+    def parse(self):
+        return self.pre_parse_matching_parentheses_check()
+
+    def pre_parse_matching_parentheses_check(self):
+        # track number of ( and )
+        for token in self.tokens:
+            if token.type == 'LP':
+                self.parentheses_tracker += 1
+            elif token.type == 'RP':
+                self.parentheses_tracker -= 1
+        # return error if not same number
+        if self.parentheses_tracker > 0:
+            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,')')
+        elif self.parentheses_tracker < 0:
+            result = Errors.MismatchedParenthesesError(abs(self.parentheses_tracker),'(')
+        else:
+            result = self.parse_set_var_or_expr()
+
+        return result
 
     def apply_operation(self, result, op, operand):
         # Apply binary operations based on the given operator
@@ -43,7 +66,7 @@ class Parser:
         else:
             return Errors.InvalidTextError('operand',operand)
 
-    def parse(self):
+    def parse_set_var_or_expr(self):
         if self.current_token.type == 'KEY':
             if self.current_token.value == 'set':
                 return self.parse_variables()
@@ -113,8 +136,8 @@ class Parser:
         elif isinstance(token, Tokens.BracketToken) and token.type == 'LP':
             self.next()
             result = self.parse_expression()
-            if self.current_token and self.current_token.type != 'RP':
-                return Errors.MismatchedParenthesesError()
+            # if self.current_token and self.current_token.type != 'RP':
+            #     return Errors.MismatchedParenthesesError()
             self.next()
             return result
 
@@ -123,7 +146,7 @@ class Parser:
         # monos
         # negative number?
         else:
-            return Errors.UnexpectedTokenError(token)
+            return Errors.UnexpectedTokenError(token.value)
 
 def main():
     run = True
@@ -156,19 +179,8 @@ def main():
             lexer = Lexer(line)
             tokens = lexer.make_tokens()
             parser = Parser(tokens)
-            result = parser.parse()
+            result = parser.pre_parse_matching_parentheses_check()
             print(result)
 
 if __name__ == '__main__':
     main()
-
-## 32850.399999999994 ##
-# print((10%3)*4**(35//4)/2+100.2-17.8)
-# (10///3)*4**(35//4)/2+100.2-17.8
-
-# TODO: comparatives
-# TODO: print
-# TODO: negative numbers
-# TODO: if/then -> test [if][then]
-# TODO: errors
-# TODO: doesn't raise error when mismatched parentheses
