@@ -66,31 +66,21 @@ class Parser:
         else:
             return Errors.InvalidTextError('operand',operand)
 
-    def parse_comparison(self):
-        result = self.parse_expression()
-
-        while self.current_token and self.current_token.type in {'GT','LT','GEQ','LEQ','NEQ','EQ'}:
-            op = self.current_token.type
-            self.next()
-
-            if self.current_token and self.current_token.type in {'VAR','INT','FLT','LP'}:
-                operand = self.parse_expression()
-            else:
-                return Errors.InvalidComparisonError() # make this
-
-            if op == 'GT':
-                result = result > operand
-            elif op == 'LT':
-                result = result < operand
-            elif op == 'GEQ':
-                result = result >= operand
-            elif op == 'LEQ':
-                result = result <= operand
-            elif op == 'NEQ':
-                result = result != operand
-            elif op == 'EQ':
-                result = result == operand
-        return result
+    def apply_comparison(self,result,op,operand):
+        # Apply comparison operations based on the given operator
+        assert operand is not None, 'Operand cannot be None'
+        if op == 'GT':
+            return result > operand
+        elif op == 'LT':
+            return result < operand
+        elif op == 'GEQ':
+            return result >= operand
+        elif op == 'LEQ':
+            return result <= operand
+        elif op == 'EQ':
+            return result == operand
+        elif op == 'NEQ':
+            return result != operand
 
     def parse_set_var_or_expr(self):
         if self.current_token.type == 'KEY':
@@ -128,19 +118,7 @@ class Parser:
             self.next()
             operand = self.parse_term()
             # Handle the comparison based on the operator
-            if op == 'GT':
-                result = result > operand
-            elif op == 'LT':
-                result = result < operand
-            elif op == 'GEQ':
-                result = result >= operand
-            elif op == 'LEQ':
-                result = result <= operand
-            elif op == 'EQ':
-                result = result == operand
-            elif op == 'NEQ':
-                result = result != operand
-
+            result = self.apply_comparison(result,op,operand)
         return result
 
     def parse_term(self):
