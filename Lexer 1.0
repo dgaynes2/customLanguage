@@ -8,7 +8,7 @@ DIGLETTS = DIGITS + LETTERS
 OPERATORS = {'+':'ADD','-':'SUB','/':'DIV','//':'FLD','///':'MOD','*':'MUL','**':'POW'}
 BRACKETS = {'(':'LP',')':'RP','[':'LS',']':'RS'}
 COMPARATIVES = {'>':'GT','<':'LT','>=':'GEQ','<=':'LEQ','=':'EQ','!=':'NEQ'}
-KEYWORDS = {'is','set','del'}
+KEYWORDS = {'is','set','del','test'}
 
 ########################################
 # LEXER
