@@ -39,6 +39,8 @@ class Parser:
 
         return result
 
+    ##### sugar #####
+
     def apply_operation(self, result, op, operand):
         # Apply binary operations based on the given operator
         assert operand is not None, 'Operand cannot be None'
@@ -82,8 +84,48 @@ class Parser:
         elif op == 'NEQ':
             return result != operand
 
+    ##### interpreting begins here #####
+
     def parse_set_var_or_expr(self):
-        if self.current_token.type == 'KEY':
+        if self.current_token.type == 'KEY' and self.current_token.value == 'test':
+            self.next()  # Move to the next token after 'test'
+
+            # Parse if-statement inside the first pair of square brackets
+            if self.current_token.type == 'LS':
+                self.next()  # Move to the next token after '['
+                condition_result = self.parse_expression()
+                if self.current_token.type == 'RS':
+                    self.next()  # Move to the next token after ']'
+                else:
+                    return Errors.MismatchedBracketsError(']')
+            else:
+                return Errors.MismatchedBracketsError('[')
+
+            # Execute then-statement inside the second pair of square brackets if the if-statement is true
+            if self.current_token.type == 'LS':
+                self.next()  # Move to the next token after '['
+                then_result = self.parse_set_var_or_expr()
+                if self.current_token.type == 'RS':
+                    self.next()  # Move to the next token after ']'
+                else:
+                    return Errors.MismatchedBracketsError(']')
+            else:
+                return Errors.MismatchedBracketsError(']')
+
+            # Execute else-statement inside the third pair of square brackets if provided
+            if self.current_token.type == 'LS':
+                self.next()  # Move to the next token after '['
+                else_result = self.parse_set_var_or_expr()
+                if self.current_token.type == 'RS':
+                    self.next()  # Move to the next token after ']'
+                else:
+                    return Errors.MismatchedBracketsError(']')
+            else:
+                else_result = None
+
+            return then_result if condition_result else else_result
+
+        elif self.current_token.type == 'KEY':
             if self.current_token.value == 'set':
                 return self.parse_variables()
         else:
