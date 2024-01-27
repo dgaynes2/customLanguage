@@ -6,7 +6,6 @@ VARIABLES = {}
 
 class Parser:
     def __init__(self,tokens):
-
         self.tokens = tokens
         self.index = -1
         self.current_token = None
@@ -19,27 +18,7 @@ class Parser:
         self.index += 1
         self.current_token = self.tokens[self.index] if self.index < len(self.tokens) else None
 
-    def parse(self):
-        return self.pre_parse_matching_parentheses_check()
-
-    def pre_parse_matching_parentheses_check(self):
-        # track number of ( and )
-        for token in self.tokens:
-            if token.type == 'LP':
-                self.parentheses_tracker += 1
-            elif token.type == 'RP':
-                self.parentheses_tracker -= 1
-        # return error if not same number
-        if self.parentheses_tracker > 0:
-            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,')')
-        elif self.parentheses_tracker < 0:
-            result = Errors.MismatchedParenthesesError(abs(self.parentheses_tracker),'(')
-        else:
-            result = self.parse_set_var_or_expr()
-
-        return result
-
-    ##### sugar #####
+    ##### SUGAR #####
 
     def apply_operation(self, result, op, operand):
         # Apply binary operations based on the given operator
@@ -84,56 +63,79 @@ class Parser:
         elif op == 'NEQ':
             return result != operand
 
-    ##### interpreting begins here #####
-
-    def parse_set_var_or_expr(self):
-        if self.current_token.type == 'KEY' and self.current_token.value == 'test':
-            self.next()  # Move to the next token after 'test'
-
-            # Parse if-statement inside the first pair of square brackets
-            if self.current_token.type == 'LS':
-                self.next()  # Move to the next token after '['
-                condition_result = self.parse_expression()
-                if self.current_token.type == 'RS':
-                    self.next()  # Move to the next token after ']'
-                else:
-                    return Errors.MismatchedBracketsError(']')
-            else:
-                return Errors.MismatchedBracketsError('[')
-
-            # Execute then-statement inside the second pair of square brackets if the if-statement is true
-            if self.current_token.type == 'LS':
-                self.next()  # Move to the next token after '['
-                then_result = self.parse_set_var_or_expr()
-                if self.current_token.type == 'RS':
-                    self.next()  # Move to the next token after ']'
-                else:
-                    return Errors.MismatchedBracketsError(']')
+    def if_statement(self):
+        if self.current_token.type == 'LS':
+            self.next()
+            condition_result = self.parse_expression()
+            if self.current_token.type == 'RS':
+                self.next()
             else:
                 return Errors.MismatchedBracketsError(']')
-
-            # Execute else-statement inside the third pair of square brackets if provided
-            if self.current_token.type == 'LS':
-                self.next()  # Move to the next token after '['
-                else_result = self.parse_set_var_or_expr()
-                if self.current_token.type == 'RS':
-                    self.next()  # Move to the next token after ']'
-                else:
-                    return Errors.MismatchedBracketsError(']')
-            else:
-                else_result = None
-
-            return then_result if condition_result else else_result
-
-        elif self.current_token.type == 'KEY':
-            if self.current_token.value == 'set':
-                return self.parse_variables()
         else:
-            return self.parse_expression()
+            return Errors.MismatchedBracketsError('[')
+
+        if self.current_token.type == 'LS':
+            self.next()
+            then_result = self.if_var_expr()
+            if self.current_token.type == 'RS':
+                self.next()
+            else:
+                return Errors.MismatchedBracketsError(']')
+        else:
+            return Errors.MismatchedBracketsError('[')
+
+        if self.current_token.type == 'LS':
+            self.next()
+            else_result = self.if_var_expr()
+            if self.current_token.type == 'RS':
+                self.next()
+            else:
+                return Errors.MismatchedBracketsError(']')
+        else:
+            else_result = None
+
+        return then_result if condition_result else else_result
+
+
+    ##### INTERPRETING #####
+
+    def parse(self):
+        return self.check_parentheses_pairs()
+
+    def check_parentheses_pairs(self):
+        # track number of ( and ) characters. Different count -> error
+        for token in self.tokens:
+            if token.type == 'LP': # (
+                self.parentheses_tracker += 1
+            elif token.type == 'RP': # )
+                self.parentheses_tracker -= 1
+        # too many )
+        if self.parentheses_tracker > 0:
+            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,')')
+        # too many (
+        elif self.parentheses_tracker < 0:
+            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,'(')
+        else:
+            # continue parsing if balanced parentheses
+            result = self.if_var_expr()
+        return result
+
+    def if_var_expr(self):
+        if self.current_token.type == 'KEY':
+            if self.current_token.value == 'test':
+                self.next()
+                return self.if_statement()
+
+            elif self.current_token.value == 'set':
+                return self.parse_variables()
+
+            else:
+                return self.parse_expression()
+        return self.parse_expression()
 
     def parse_variables(self):
         self.next()
-        token = self.current_token # var
+        token = self.current_token
         if token.type == 'VAR':
             variable_name = token.value
             self.next()
@@ -152,14 +154,19 @@ class Parser:
                 result += self.parse_term()
             elif self.current_token.type == 'SUB':
                 self.next()
-                result -= self.parse_term()
+                if self.current_token and self.current_token.type in {'VAR','INT','FLT','LP'}:
+                    term = self.parse_term()
+                    if isinstance(term,(int,float)):
+                        result -= term
+                    else:
+                        return term
+                else:
+                    return Errors.UnexpectedTokenError(self.current_token.value)
 
-        # is current token comparison > >= < <= != ==
         while self.current_token and self.current_token.type in {'GT', 'LT', 'GEQ', 'LEQ', 'EQ', 'NEQ'}:
             op = self.current_token.type
             self.next()
             operand = self.parse_term()
-            # Handle the comparison based on the operator
             result = self.apply_comparison(result,op,operand)
         return result
 
@@ -204,12 +211,9 @@ class Parser:
             self.next()
             return result
 
-        # keywords
-        # constants
-        # monos
-        # negative number?
         else:
             return Errors.UnexpectedTokenError(token.value)
+
 
 def main():
     run = True
@@ -242,7 +246,7 @@ def main():
             lexer = Lexer(line)
             tokens = lexer.make_tokens()
             parser = Parser(tokens)
-            result = parser.pre_parse_matching_parentheses_check()
+            result = parser.check_parentheses_pairs()
             print(result)
 
 if __name__ == '__main__':
