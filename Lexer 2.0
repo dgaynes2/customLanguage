@@ -1,18 +1,5 @@
-import string
+import Categories
 import Tokens
-
-BLANKS = {' ','\t','\n'}
-DIGITS = '1234567890'
-LETTERS = string.ascii_letters
-DIGLETTS = DIGITS + LETTERS
-OPERATORS = {'+':'ADD','-':'SUB','/':'DIV','//':'FLD','///':'MOD','*':'MUL','**':'POW'}
-BRACKETS = {'(':'LP',')':'RP','[':'LS',']':'RS'}
-COMPARATIVES = {'>':'GT','<':'LT','>=':'GEQ','<=':'LEQ','=':'EQ','!=':'NEQ'}
-KEYWORDS = {'is','set','del','test'}
-
-########################################
-# LEXER
-########################################
 
 class Lexer:
     def __init__(self,text):
@@ -22,7 +9,6 @@ class Lexer:
         self.next()
 
     def next(self):
-        # move to next char in output
         self.index += 1
         self.current_char = self.text[self.index] if self.index < len(self.text) else "EOF"
 
@@ -30,35 +16,34 @@ class Lexer:
         tokens = []
 
         while self.current_char:
-            # ignore blank space
-            if self.current_char in BLANKS:
+            # ignore blanks
+            if self.current_char in Categories.BLANKS:
                 self.next()
-            # differentiate between subtraction token and negative number token
-            # elif self.current_char == '-':
-            #     if self.text[self.index + 1] and self.text[self.index + 1] in DIGITS + '.':
-            #         tokens.append(self.make_number())
-            #         self.next()
-            #     else:
-            #         tokens.append(Tokens.OperatorToken('SUB','-'))
-            #         self.next()
-            # # numbers 1 2 3 4 5 6 7 8 9 0 . -
-            # elif self.current_char in DIGITS + '.' + '-':
-            #     tokens.append(self.make_number())
-            elif self.current_char in DIGITS + '.':
-                tokens.append(self.make_number())
-            # words
-            elif self.current_char in LETTERS:
-                tokens.append(Tokens.Token(*self.make_word()))
-            # operators + - / // /// * **
-            elif self.current_char in OPERATORS:
+            # numbers 1 2 3 4 5 6 7 8 9 0 . -
+            elif self.current_char in Categories.DIGITS + '.' + '-':
+                if self.current_char == '-':
+                    # part of negative number
+                    if self.text[self.index + 1] and self.text[self.index + 1] in Categories.DIGITS + '.':
+                        tokens.append(self.make_number())
+                    # subtraction
+                    else:
+                        tokens.append(Tokens.OperatorToken('SUB','-'))
+                        self.next()
+                else:
+                    tokens.append(self.make_number())
+            # operators
+            elif self.current_char in Categories.OPERATORS:
                 tokens.append(Tokens.OperatorToken(*self.make_operator()))
             # brackets ( ) [ ]
-            elif self.current_char in BRACKETS:
-                tokens.append(Tokens.BracketToken(BRACKETS[self.current_char],self.current_char))
+            elif self.current_char in Categories.BRACKETS:
+                tokens.append(Tokens.BracketToken(Categories.BRACKETS[self.current_char],self.current_char))
                 self.next()
             # comparatives > >= < <= = !=
             elif self.current_char in '><!=':
                 tokens.append(Tokens.ComparativeToken(*self.make_comparative()))
+            # words
+            elif self.current_char in Categories.LETTERS:
+                tokens.append(Tokens.Token(*self.make_word()))
             # EOF
             elif self.current_char == 'EOF':
                 break
@@ -72,7 +57,7 @@ class Lexer:
         decimal_count = 1 if self.current_char == '.' else 0
         self.next()
 
-        while self.current_char and self.current_char in DIGITS + '.':
+        while self.current_char and self.current_char in Categories.DIGITS + '.':
             if self.current_char == '.':
                 if decimal_count == 1:
                     return 'Error: too many decimals'
@@ -80,7 +65,7 @@ class Lexer:
             num_str += self.current_char
             self.next()
 
-        # 0 before beginning decimal
+        # 0 before leading decimal
         if num_str.startswith('.'):
             num_str = '0' + num_str
         # -.1 -> -0.1
@@ -94,12 +79,12 @@ class Lexer:
         if num_str.endswith('.'):
             num_str += '0'
 
-        # remove leading 0s
+        # remove extra leading 0's
         if decimal_count == 0:
             if num_str.startswith('0'):
                 while num_str.startswith('0'):
                     num_str = num_str[1:]
-            # -000001 -> -1
+            # -00001 -> -1
             elif num_str.startswith('-'):
                 num_str = num_str[1:]
                 if num_str.startswith('0'):
@@ -108,47 +93,46 @@ class Lexer:
                 num_str = '-' + num_str
 
         return Tokens.FloatToken(num_str) if decimal_count else Tokens.IntegerToken(num_str)
-        # return 'FLT' if decimal_count == 1 else 'INT',num_str
 
     def make_word(self):
         word_str = self.current_char
         self.next()
 
-        while self.current_char in LETTERS + '_':
+        while self.current_char and self.current_char in Categories.LETTERS + '_':
             word_str += self.current_char
             self.next()
 
-        return 'KEY' if word_str in KEYWORDS else 'VAR',word_str
+        return 'KEY' if word_str in Categories.KEYWORDS else 'VAR', word_str
 
     def make_operator(self):
+        # + - / *
         op_str = self.current_char
 
-        if self.text[self.index+1]:
-            if self.text[self.index+1] == op_str[-1]:
+        if self.text[self.index + 1]:
+            # // **
+            if self.text[self.index + 1] and self.text[self.index + 1] == op_str[-1]:
                 self.next()
                 op_str += self.current_char
+                # ///
                 if self.text[self.index + 1]:
-                    if self.text[self.index + 1] == op_str[-1]:
+                    if self.text[self.index + 1] and self.text[self.index + 1] == op_str[-1]:
                         self.next()
                         op_str += self.current_char
         self.next()
-        return OPERATORS[op_str],op_str
+        return Categories.OPERATORS[op_str], op_str
 
     def make_comparative(self):
-        com_str = self.current_char
+        comp_str = self.current_char
         self.next()
 
         if self.current_char == '=':
-            com_str += self.current_char
+            comp_str += self.current_char
             self.next()
 
-        if com_str == '!':
+        if comp_str == '!':
             return 'Error: "!" needs a following "="'
 
-        # self.next()
-        return COMPARATIVES[com_str],com_str
-
-
+        return Categories.COMPARATIVES[comp_str], comp_str
 
 def token_test():
     to_test = {
@@ -157,8 +141,11 @@ def token_test():
         'FLT':'. -. .1 1. 1.1 -1.',
         'CMPR':'> >= < <= != =',
         'BRKT':'( ) [ ]',
-        'CMBO':'2.5**4///(7.66)+1-1',
-        'KEY':'is set del'
+        'CMBO':'2.5**4///(7.66)+1--1',
+        'KEY':'is set del test',
+        'a':'test[(2 * 3)-1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        'b':'test[(2 * 3)- 1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        'c':'test[(2 * 3)- -1 >= 1.44 ** 3][2 + 2][3 + 3]',
     }
     for _set_ in to_test:
         to_show = f"| {_set_}{' '*(5-len(_set_))}: "
@@ -168,5 +155,4 @@ def token_test():
             to_show += f"{i.type}:{i.value}, "
         to_show = to_show.strip(', ') # remove final comma
         print(to_show)
-
-# token_test()
+token_test()
