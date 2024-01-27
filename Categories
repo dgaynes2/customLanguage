@@ -1,0 +1,35 @@
+import string
+
+DIGITS = '1234567890'
+LETTERS = string.ascii_letters
+DIGLETTS = DIGITS + LETTERS
+
+BLANKS = {
+    ' ',
+    '\t',
+    '\n'
+}
+
+OPERATORS = {
+    '+':'ADD',
+    '-':'SUB',
+    '/':'DIV','//':'FLD','///':'MOD',
+    '*':'MUL','**':'POW'
+}
+
+BRACKETS = {
+    '(':'LP',')':'RP',
+    '[':'LS',']':'RS'
+}
+
+COMPARATIVES = {
+    '>':'GT','>=':'GEQ',
+    '<':'LT','<=':'LEQ',
+    '=':'EQ','!=':'NEQ'
+}
+KEYWORDS = {
+    'is',
+    'set',
+    'del',
+    'test'
+}
