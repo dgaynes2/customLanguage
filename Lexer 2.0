@@ -12,6 +12,12 @@ class Lexer:
         self.index += 1
         self.current_char = self.text[self.index] if self.index < len(self.text) else "EOF"
 
+    def peek(self,look_for=None):
+        if not look_for:
+            return self.text[self.index + 1]
+        else:
+            return self.text[self.index + 1] and self.text[self.index + 1] == look_for
+
     def make_tokens(self):
         tokens = []
 
@@ -23,7 +29,7 @@ class Lexer:
             elif self.current_char in Categories.DIGITS + '.' + '-':
                 if self.current_char == '-':
                     # part of negative number
-                    if self.text[self.index + 1] and self.text[self.index + 1] in Categories.DIGITS + '.':
+                    if self.peek() and self.peek() in Categories.DIGITS + '.':
                         tokens.append(self.make_number())
                     # subtraction
                     else:
@@ -108,14 +114,14 @@ class Lexer:
         # + - / *
         op_str = self.current_char
 
-        if self.text[self.index + 1]:
+        if self.peek():
             # // **
-            if self.text[self.index + 1] and self.text[self.index + 1] == op_str[-1]:
+            if self.peek() and self.peek() == op_str[-1]:
                 self.next()
                 op_str += self.current_char
                 # ///
-                if self.text[self.index + 1]:
-                    if self.text[self.index + 1] and self.text[self.index + 1] == op_str[-1]:
+                if self.peek():
+                    if self.peek() and self.peek() == op_str[-1]:
                         self.next()
                         op_str += self.current_char
         self.next()
@@ -136,16 +142,17 @@ class Lexer:
 
 def token_test():
     to_test = {
-        'OP': '+ - * ** / // ///',
-        'INT': '1 -1 01 -01 10 -10',
-        'FLT':'. -. .1 1. 1.1 -1.',
-        'CMPR':'> >= < <= != =',
-        'BRKT':'( ) [ ]',
-        'CMBO':'2.5**4///(7.66)+1--1',
-        'KEY':'is set del test',
-        'a':'test[(2 * 3)-1 >= 1.44 ** 3][2 + 2][3 + 3]',
-        'b':'test[(2 * 3)- 1 >= 1.44 ** 3][2 + 2][3 + 3]',
-        'c':'test[(2 * 3)- -1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'OP': '+ - * ** / // ///',
+        # 'INT': '1 -1 01 -01 10 -10',
+        # 'FLT':'. -. .1 1. 1.1 -1.',
+        # 'CMPR':'> >= < <= != =',
+        # 'BRKT':'( ) [ ]',
+        # 'CMBO':'2.5**4///(7.66)+1--1',
+        # 'KEY':'is set del test',
+        # 'a':'test[(2 * 3)-1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'b':'test[(2 * 3)- 1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'c':'test[(2 * 3)--1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        'test':'1-1--1 - 1- 1'
     }
     for _set_ in to_test:
         to_show = f"| {_set_}{' '*(5-len(_set_))}: "
@@ -155,4 +162,8 @@ def token_test():
             to_show += f"{i.type}:{i.value}, "
         to_show = to_show.strip(', ') # remove final comma
         print(to_show)
+        print('| crnt : INT:1, INT:-1, SUB:-, INT:-1, SUB:-, INT:1, SUB:-, INT:1')
+        print('| goal : INT:1, SUB:-, INT:1, SUB:-, INT:-1, SUB:-, INT:1, SUB:-, INT:1')
 token_test()
+
+# TODO: sub/neg tokens -> -1 always negative one, - 1 always minus one. Change so - always minus unless not between two numbers
