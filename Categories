@@ -33,3 +33,10 @@ KEYWORDS = {
     'del',
     'test'
 }
+
+MATH = {
+    'CLG',
+    'FLR',
+    'RND',
+    'SQRT',
+}
