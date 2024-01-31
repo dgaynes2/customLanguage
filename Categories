@@ -35,8 +35,12 @@ KEYWORDS = {
 }
 
 MATH = {
-    'CLG',
-    'FLR',
+    'INT','FLT',
+    'CLG','FLR',
     'RND',
     'SQRT',
+    'FAC',
+    'LOG',
+    'SIN','COS','TAN',
+    'ABS',
 }
