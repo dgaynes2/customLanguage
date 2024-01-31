@@ -1,10 +1,14 @@
-import math
-
+# custom
 from Lexer import Lexer
 import Tokens
 import Errors
 
-VARIABLES = {}
+# libraries
+import math
+
+IMMUTABLES = {'pi':math.pi,'e':math.e,'dbday':'3.24','mbday':'1.22'}
+# global dictionary for storing assigned variables
+VARIABLES = IMMUTABLES.copy()
 
 class Parser:
     def __init__(self,tokens):
@@ -13,7 +17,7 @@ class Parser:
         self.current_token = None
         self.next()
 
-        # track ( and ) characters
+        # track ( and ) characters for syntax error
         self.parentheses_tracker = 0
 
     def next(self):
@@ -22,15 +26,15 @@ class Parser:
 
     ##### SUGAR #####
 
-    def apply_operation(self, result, op, operand):
-        # Apply binary operations based on the given operator
+    def apply_operation(self,result,op,operand):
+        # Apply binary operation based on given operator
         assert operand is not None, 'Operand cannot be None'
         if type(operand) in [int,float]:
-            if op == 'ADD':
+            if op == 'ADD': # +
                 return result + operand
-            elif op == 'SUB':
+            elif op == 'SUB': # -
                 return result - operand
-            elif op == 'MUL':
+            elif op == 'MUL': # *
                 return result * operand
             elif op == 'DIV': # /
                 if operand != 0:
@@ -52,52 +56,41 @@ class Parser:
     def apply_comparison(self,result,op,operand):
         # Apply comparison operations based on the given operator
         assert operand is not None, 'Operand cannot be None'
-        if op == 'GT':
+        if op == 'GT':    # >
             return result > operand
-        elif op == 'LT':
+        elif op == 'LT':  # <
             return result < operand
-        elif op == 'GEQ':
+        elif op == 'GEQ': # >=
             return result >= operand
-        elif op == 'LEQ':
+        elif op == 'LEQ': # <=
             return result <= operand
-        elif op == 'EQ':
-            return result == operand
-        elif op == 'NEQ':
+        elif op == 'NEQ': # !=
             return result != operand
+        elif op == 'EQ':  # =
+            return result == operand
 
     def apply_math(self,result,op):
-        if op == 'CLG':
-            return math.ceil(result)
-        elif op == 'FLR':
-            return math.floor(result)
+        match op:
+            case 'CLG': return math.ceil(result)
+            case 'FLR': return math.floor(result)
+            case 'INT': return int(result)
+            case 'FLT': return float(result)
+            case 'RND': return round(result)
+            case 'SQRT':return math.sqrt(result)
+            case 'FAC': return math.factorial(result)
+            case 'LOG': return math.log(result)
+            case 'ABS': return math.fabs(result)
+            case 'SIN': return math.sin(result)
+            case 'COS': return math.cos(result)
+            case 'TAN': return math.tan(result)
 
-        elif op == 'INT':
-            return int(result)
-        elif op == 'FLT':
-            return float(result)
-
-        elif op == 'RND':
-            return round(result)
-        elif op == 'SQRT':
-            return math.sqrt(result)
-        elif op == 'FAC':
-            return math.factorial(result)
-        elif op == 'LOG':
-            return math.log(result)
-        elif op == 'ABS':
-            return math.fabs(result)
-
-        elif op == 'SIN':
-            return math.sin(result)
-        elif op == 'COS':
-            return math.cos(result)
-        elif op == 'TAN':
-            return math.tan(result)
+    ##### CONDITIONAL STATEMENTS #####
 
     def if_statement(self):
+        # if statement
         if self.current_token.type == 'LS':
             self.next()
-            condition_result = self.parse_expression()
+            if_result = self.parse_expression()
             if self.current_token.type == 'RS':
                 self.next()
             else:
@@ -105,6 +98,7 @@ class Parser:
         else:
             return Errors.MismatchedBracketsError('[')
 
+        # if statement TRUE
         if self.current_token.type == 'LS':
             self.next()
             then_result = self.if_var_expr()
@@ -115,6 +109,7 @@ class Parser:
         else:
             return Errors.MismatchedBracketsError('[')
 
+        # if statement FALSE
         if self.current_token.type == 'LS':
             self.next()
             else_result = self.if_var_expr()
@@ -125,7 +120,7 @@ class Parser:
         else:
             else_result = None
 
-        return then_result if condition_result else else_result
+        return then_result if if_result else else_result
 
     ##### INTERPRETING #####
 
@@ -144,27 +139,32 @@ class Parser:
             result = Errors.MismatchedParenthesesError(self.parentheses_tracker,')')
         # too many (
         elif self.parentheses_tracker < 0:
-            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,'(')
+            result = Errors.MismatchedParenthesesError(abs(self.parentheses_tracker),'(')
+        # continue parsing if balanced parentheses
         else:
-            # continue parsing if balanced parentheses
             result = self.if_var_expr()
         return result
 
     def if_var_expr(self):
         if self.current_token.type == 'KEY':
+            # is input an if-statement  "test[if][yes][no] all [] required"
             if self.current_token.value == 'test':
                 self.next()
                 return self.if_statement()
 
+            # set variable  "set var_name is value"
             elif self.current_token.value == 'set':
                 return self.parse_variables()
 
+            # use built-in math statement
             elif self.current_token.type == 'MATH':
                 return self.apply_math(self.parse_expression(),self.current_token.value)
         return self.parse_expression()
 
     def parse_variables(self):
         self.next()
+        if self.current_token.value in IMMUTABLES:
+            return Errors.ImmutableVariableError()
         token = self.current_token
         if token.type == 'VAR':
             variable_name = token.value
@@ -173,42 +173,48 @@ class Parser:
                 self.next()
                 VARIABLES[variable_name] = self.parse_expression()
                 return Errors.SetVariableMessage(variable_name,VARIABLES[variable_name])
+            return Errors.InvalidSyntaxError("Error: use syntax 'set var_name is value' to set variable")
         return Errors.InvalidVariableAssignmentError()
 
     def parse_expression(self):
         result = self.parse_term()
 
-        while self.current_token and self.current_token.type in {'ADD', 'SUB', 'MATH'}:
+        while self.current_token and self.current_token.type in {'ADD','SUB','MATH'}:
+            # addition
             if self.current_token.type == 'ADD':
                 self.next()
                 term = self.parse_term()
-                if isinstance(term, Errors.UnexpectedTokenError):
+                if isinstance(term,Errors.UnexpectedTokenError):
                     return term
                 result += term
+            # subtraction
             elif self.current_token.type == 'SUB':
                 self.next()
                 term = self.parse_term()
-                if isinstance(term, Errors.UnexpectedTokenError):
+                if isinstance(term,Errors.UnexpectedTokenError):
                     return term
                 result -= term
+            # funky math
             elif self.current_token.type == 'MATH':
-                result = self.apply_math(result, self.current_token.value)
+                result = self.apply_math(result,self.current_token.value)
                 self.next()
             else:
                 break
 
+        # comparison operators
         while self.current_token and self.current_token.type in {'GT', 'LT', 'GEQ', 'LEQ', 'EQ', 'NEQ'}:
             op = self.current_token.type
             self.next()
             operand = self.parse_term()
-            result = self.apply_comparison(result, op, operand)
+            result = self.apply_comparison(result,op,operand)
 
         return result
 
     def parse_term(self):
         result = self.parse_exponent()
 
-        while self.current_token and self.current_token.type in {'MUL', 'DIV', 'FLD', 'MOD'}:
+        # multiplication, divisions
+        while self.current_token and self.current_token.type in {'MUL','DIV','FLD','MOD'}:
             op = self.current_token.type
             self.next()
             operand = self.parse_exponent()
@@ -222,7 +228,7 @@ class Parser:
         while self.current_token and self.current_token.type == 'POW':
             self.next()
             factor = self.parse_factor()
-            if not isinstance(result, (int, float)) or not isinstance(factor, (int, float)):
+            if not isinstance(result,(int,float)) or not isinstance(factor,(int,float)):
                 return Errors.ExponentError()
             result **= factor
 
@@ -230,27 +236,29 @@ class Parser:
 
     def parse_factor(self):
         token = self.current_token
-        # get variable value
+        # get variable value from VARIABLES dict
         if token.type == 'VAR':
             self.next()
             if token.value in VARIABLES:
                 return VARIABLES[token.value]
             return Errors.InvalidVariableError(token.value)
 
+        # integer or float
         elif isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
             self.next()
             return float(token.value) if '.' in token.value else int(token.value)
 
-        elif isinstance(token, Tokens.BracketToken) and token.type == 'LP':
+        # restart interpreter chain if current token is (
+        elif isinstance(token,Tokens.BracketToken) and token.type == 'LP':
             self.next()
             result = self.parse_expression()
             self.next()
             return result
 
+        # funky math
         elif token.type == 'MATH':
             self.next()
             return self.apply_math(self.parse_expression(),token.value)
-
         else:
             return Errors.UnexpectedTokenError(token.value)
 
@@ -291,3 +299,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+## 32850.399999999994 ##
+# print((10%3)*4**(35//4)/2+100.2-17.8)
+# (10///3)*4**(35//4)/2+100.2-17.8
+
+# test[2>-2][set pos is 1][set neg is -1]
