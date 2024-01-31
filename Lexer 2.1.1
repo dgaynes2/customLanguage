@@ -1,307 +1,178 @@
-# custom
-from Lexer import Lexer
+import Categories
 import Tokens
-import Errors
 
-# libraries
-import math
-
-IMMUTABLES = {'pi':math.pi,'e':math.e,'dbday':'3.24','mbday':'1.22'}
-# global dictionary for storing assigned variables
-VARIABLES = IMMUTABLES.copy()
-
-class Parser:
-    def __init__(self,tokens):
-        self.tokens = tokens
+class Lexer:
+    def __init__(self,text):
+        self.text = text
         self.index = -1
-        self.current_token = None
+        self.current_char = None
         self.next()
-
-        # track ( and ) characters for syntax error
-        self.parentheses_tracker = 0
 
     def next(self):
         self.index += 1
-        self.current_token = self.tokens[self.index] if self.index < len(self.tokens) else None
+        self.current_char = self.text[self.index] if self.index < len(self.text) else "EOF"
 
-    ##### SUGAR #####
-
-    def apply_operation(self,result,op,operand):
-        # Apply binary operation based on given operator
-        assert operand is not None, 'Operand cannot be None'
-        if type(operand) in [int,float]:
-            if op == 'ADD': # +
-                return result + operand
-            elif op == 'SUB': # -
-                return result - operand
-            elif op == 'MUL': # *
-                return result * operand
-            elif op == 'DIV': # /
-                if operand != 0:
-                    return result / operand
-                return Errors.DivideByZeroError()
-            elif op == 'FLD': # //
-                if operand != 0:
-                    return result // operand
-                return Errors.DivideByZeroError()
-            elif op == 'MOD': # %
-                if operand != 0:
-                    return result % operand
-                return Errors.DivideByZeroError()
-            else:
-                return Errors.InvalidTextError('operator',op)
+    def peek(self,how_far=1,look_for=None):
+        # check existence and content of index-n
+        if not look_for:
+            return self.text[self.index + how_far]
         else:
-            return Errors.InvalidTextError('operand',operand)
+            return self.text[self.index + how_far] and self.text[self.index + how_far] == look_for
 
-    def apply_comparison(self,result,op,operand):
-        # Apply comparison operations based on the given operator
-        assert operand is not None, 'Operand cannot be None'
-        if op == 'GT':    # >
-            return result > operand
-        elif op == 'LT':  # <
-            return result < operand
-        elif op == 'GEQ': # >=
-            return result >= operand
-        elif op == 'LEQ': # <=
-            return result <= operand
-        elif op == 'NEQ': # !=
-            return result != operand
-        elif op == 'EQ':  # =
-            return result == operand
+    def get_next_char(self):
+        # find next non-blank and peek it
+        n = 0
+        while self.text[self.index + n] in Categories.BLANKS:
+            n += 1
+        return n
 
-    def apply_math(self,result,op):
-        match op:
-            case 'CLG': return math.ceil(result)
-            case 'FLR': return math.floor(result)
-            case 'INT': return int(result)
-            case 'FLT': return float(result)
-            case 'RND': return round(result)
-            case 'SQRT':return math.sqrt(result)
-            case 'FAC': return math.factorial(result)
-            case 'LOG': return math.log(result)
-            case 'ABS': return math.fabs(result)
-            case 'SIN': return math.sin(result)
-            case 'COS': return math.cos(result)
-            case 'TAN': return math.tan(result)
-
-    ##### CONDITIONAL STATEMENTS #####
-
-    def if_statement(self):
-        # if statement
-        if self.current_token.type == 'LS':
+    def skip_spaces(self):
+        # continue increasing index while no char found
+        while self.current_char in Categories.BLANKS:
             self.next()
-            if_result = self.parse_expression()
-            if self.current_token.type == 'RS':
+
+    def make_tokens(self):
+        tokens = []
+
+        while self.current_char:
+            # ignore blanks
+            if self.current_char in Categories.BLANKS:
                 self.next()
-            else:
-                return Errors.MismatchedBracketsError(']')
-        else:
-            return Errors.MismatchedBracketsError('[')
-
-        # if statement TRUE
-        if self.current_token.type == 'LS':
-            self.next()
-            then_result = self.if_var_expr()
-            if self.current_token.type == 'RS':
+            # numbers 0 1 2 3 4 5 6 7 8 9 .
+            elif self.current_char in Categories.DIGITS + '.':
+                tokens.append(self.make_number())
+            # operators
+            elif self.current_char in Categories.OPERATORS:
+                tokens.append(Tokens.OperatorToken(*self.make_operator()))
+            # brackets ( ) [ ]
+            elif self.current_char in Categories.BRACKETS:
+                tokens.append(Tokens.BracketToken(Categories.BRACKETS[self.current_char],self.current_char))
                 self.next()
-            else:
-                return Errors.MismatchedBracketsError(']')
-        else:
-            return Errors.MismatchedBracketsError('[')
+            # comparatives > >= < <= = !=
+            elif self.current_char in '><!=':
+                tokens.append(Tokens.ComparativeToken(*self.make_comparative()))
+            # words
+            elif self.current_char in Categories.LETTERS:
+                tokens.append(Tokens.Token(*self.make_word()))
 
-        # if statement FALSE
-        if self.current_token.type == 'LS':
-            self.next()
-            else_result = self.if_var_expr()
-            if self.current_token.type == 'RS':
-                self.next()
-            else:
-                return Errors.MismatchedBracketsError(']')
-        else:
-            else_result = None
-
-        return then_result if if_result else else_result
-
-    ##### INTERPRETING #####
-
-    def parse(self):
-        return self.check_parentheses_pairs()
-
-    def check_parentheses_pairs(self):
-        # track number of ( and ) characters. Different count -> error
-        for token in self.tokens:
-            if token.type == 'LP': # (
-                self.parentheses_tracker += 1
-            elif token.type == 'RP': # )
-                self.parentheses_tracker -= 1
-        # too many )
-        if self.parentheses_tracker > 0:
-            result = Errors.MismatchedParenthesesError(self.parentheses_tracker,')')
-        # too many (
-        elif self.parentheses_tracker < 0:
-            result = Errors.MismatchedParenthesesError(abs(self.parentheses_tracker),'(')
-        # continue parsing if balanced parentheses
-        else:
-            result = self.if_var_expr()
-        return result
-
-    def if_var_expr(self):
-        if self.current_token.type == 'KEY':
-            # is input an if-statement  "test[if][yes][no] all [] required"
-            if self.current_token.value == 'test':
-                self.next()
-                return self.if_statement()
-
-            # set variable  "set var_name is value"
-            elif self.current_token.value == 'set':
-                return self.parse_variables()
-
-            # use built-in math statement
-            elif self.current_token.type == 'MATH':
-                return self.apply_math(self.parse_expression(),self.current_token.value)
-        return self.parse_expression()
-
-    def parse_variables(self):
-        self.next()
-        if self.current_token.value in IMMUTABLES:
-            return Errors.ImmutableVariableError()
-        token = self.current_token
-        if token.type == 'VAR':
-            variable_name = token.value
-            self.next()
-            if self.current_token and self.current_token.value == 'is':
-                self.next()
-                VARIABLES[variable_name] = self.parse_expression()
-                return Errors.SetVariableMessage(variable_name,VARIABLES[variable_name])
-            return Errors.InvalidSyntaxError("Error: use syntax 'set var_name is value' to set variable")
-        return Errors.InvalidVariableAssignmentError()
-
-    def parse_expression(self):
-        result = self.parse_term()
-
-        while self.current_token and self.current_token.type in {'ADD','SUB','MATH'}:
-            # addition
-            if self.current_token.type == 'ADD':
-                self.next()
-                term = self.parse_term()
-                if isinstance(term,Errors.UnexpectedTokenError):
-                    return term
-                result += term
-            # subtraction
-            elif self.current_token.type == 'SUB':
-                self.next()
-                term = self.parse_term()
-                if isinstance(term,Errors.UnexpectedTokenError):
-                    return term
-                result -= term
-            # funky math
-            elif self.current_token.type == 'MATH':
-                result = self.apply_math(result,self.current_token.value)
-                self.next()
-            else:
+            # EOF
+            elif self.current_char == 'EOF':
                 break
 
-        # comparison operators
-        while self.current_token and self.current_token.type in {'GT', 'LT', 'GEQ', 'LEQ', 'EQ', 'NEQ'}:
-            op = self.current_token.type
-            self.next()
-            operand = self.parse_term()
-            result = self.apply_comparison(result,op,operand)
-
-        return result
-
-    def parse_term(self):
-        result = self.parse_exponent()
-
-        # multiplication, divisions
-        while self.current_token and self.current_token.type in {'MUL','DIV','FLD','MOD'}:
-            op = self.current_token.type
-            self.next()
-            operand = self.parse_exponent()
-            result = self.apply_operation(result,op,operand)
-
-        return result
-
-    def parse_exponent(self):
-        result = self.parse_factor()
-
-        while self.current_token and self.current_token.type == 'POW':
-            self.next()
-            factor = self.parse_factor()
-            if not isinstance(result,(int,float)) or not isinstance(factor,(int,float)):
-                return Errors.ExponentError()
-            result **= factor
-
-        return result
-
-    def parse_factor(self):
-        token = self.current_token
-        # get variable value from VARIABLES dict
-        if token.type == 'VAR':
-            self.next()
-            if token.value in VARIABLES:
-                return VARIABLES[token.value]
-            return Errors.InvalidVariableError(token.value)
-
-        # integer or float
-        elif isinstance(token,(Tokens.FloatToken,Tokens.IntegerToken)):
-            self.next()
-            return float(token.value) if '.' in token.value else int(token.value)
-
-        # restart interpreter chain if current token is (
-        elif isinstance(token,Tokens.BracketToken) and token.type == 'LP':
-            self.next()
-            result = self.parse_expression()
-            self.next()
-            return result
-
-        # funky math
-        elif token.type == 'MATH':
-            self.next()
-            return self.apply_math(self.parse_expression(),token.value)
-        else:
-            return Errors.UnexpectedTokenError(token.value)
-
-
-def main():
-    run = True
-    while run:
-        line = input('> ')
-        if line.strip() == '':
-            continue
-        elif line.lower() in {'exit','quit'}:
-            run = False
-        elif line.strip().lower() == 'vardict':
-            print(VARIABLES)
-        elif line.lower().startswith('cleardict'):
-            VARIABLES.clear()
-            print('All variables deleted')
-        elif line.lower().startswith('del'):
-            lexer = Lexer(line[3:])
-            tokens = lexer.make_tokens()
-            if len(tokens) > 0:
-                if tokens[0].type == 'VAR':
-                    if tokens[0].value in VARIABLES:
-                        VARIABLES.pop(tokens[0].value)
-                        print(Errors.VariableDeletedMessage(tokens[0].value))
-                    else:
-                        print(f'Variable "{tokens[0].value}" not found')
-                else:
-                    print(Errors.VariableNotFoundError(tokens[0].value))
+            # unknown character
             else:
-                print(Errors.DelSyntaxError())
-        else:
-            lexer = Lexer(line)
-            tokens = lexer.make_tokens()
-            parser = Parser(tokens)
-            result = parser.check_parentheses_pairs()
-            print(result)
+                return f'Error: unknown character, {self.current_char}'
 
-if __name__ == '__main__':
-    main()
+        # I hate this. How to incorporate
+        for token in tokens:
+            if isinstance(token,Tokens.OperatorToken):
+                if tokens[tokens.index(token)+1]:
+                    n = tokens[tokens.index(token)+1]
+                    if isinstance(n,Tokens.OperatorToken) and n.type == 'SUB':
+                        if tokens[tokens.index(token)+2]:
+                            m = tokens[tokens.index(token)+2]
+                            if isinstance(m,Tokens.IntegerToken) or isinstance(m,Tokens.FloatToken):
+                                m.value = '-' + m.value
+                                tokens.remove(n)
 
-## 32850.399999999994 ##
-# print((10%3)*4**(35//4)/2+100.2-17.8)
-# (10///3)*4**(35//4)/2+100.2-17.8
 
-# test[2>-2][set pos is 1][set neg is -1]
+        return tokens
+
+    def make_number(self,negative=False):
+        num_str = self.current_char
+        decimal_count = 1 if self.current_char == '.' else 0
+        self.next()
+
+        while self.current_char and self.current_char in Categories.DIGITS + '.':
+            if self.current_char == '.':
+                if decimal_count == 1:
+                    return 'Error: too many decimals'
+                decimal_count += 1
+            num_str += self.current_char
+            self.next()
+
+        # 0 before leading decimal
+        if num_str.startswith('.'):
+            num_str = '0' + num_str
+
+        # 0 after ending decimal
+        if num_str.endswith('.'):
+            num_str += '0'
+
+        # remove extra leading 0's
+        if decimal_count == 0:
+            if num_str.startswith('0'):
+                while num_str.startswith('0'):
+                    num_str = num_str[1:]
+
+        if negative:
+            num_str = '-' + num_str
+        return Tokens.FloatToken(num_str) if decimal_count else Tokens.IntegerToken(num_str)
+
+    def make_word(self):
+        word_str = self.current_char
+        self.next()
+
+        while self.current_char and self.current_char in Categories.LETTERS + '_':
+            word_str += self.current_char
+            self.next()
+
+        return 'KEY' if word_str in Categories.KEYWORDS else 'MATH' if word_str in Categories.MATH else 'VAR', word_str
+
+    def make_operator(self):
+        # + - / *
+        op_str = self.current_char
+
+        if self.peek():
+            if self.peek(self.get_next_char()) == '-':
+                self.next()
+                return 'SUB','-'
+
+            # // **
+            elif self.peek() and self.peek() == op_str[-1]:
+                self.next()
+                op_str += self.current_char
+                # ///
+                if self.peek():
+                    if self.peek() and self.peek() == op_str[-1]:
+                        self.next()
+                        op_str += self.current_char
+            self.next()
+        return Categories.OPERATORS[op_str], op_str
+
+    def make_comparative(self):
+        comp_str = self.current_char
+        self.next()
+
+        if self.current_char == '=':
+            comp_str += self.current_char
+            self.next()
+
+        if comp_str == '!':
+            return 'Error: "!" needs a following "="'
+
+        return Categories.COMPARATIVES[comp_str], comp_str
+
+def token_test():
+    to_test = {
+        # 'OP': '+ - * ** / // ///',
+        # 'INT': '1 -1 01 -01 10 -10',
+        # 'FLT':'. -. .1 1. 1.1 -1.',
+        # 'CMPR':'> >= < <= != =',
+        # 'BRKT':'( ) [ ]',
+        # 'CMBO':'2.5**4///(7.66)+1--1',
+        # 'KEY':'is set del test',
+        # 'a':'test[(2 * 3)-1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'b':'test[(2 * 3)- 1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'c':'test[(2 * 3)--1 >= 1.44 ** 3][2 + 2][3 + 3]',
+        # 'test':'1-1--1 - 1- 1'
+    }
+    for _set_ in to_test:
+        to_show = f"| {_set_}{' '*(5-len(_set_))}: "
+        lexer = Lexer(to_test[_set_])
+
+        for i in lexer.make_tokens():
+            to_show += f"{i.type}:{i.value}, "
+        to_show = to_show.strip(', ') # remove final comma
+        print(to_show)
+# token_test()
