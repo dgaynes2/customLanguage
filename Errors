@@ -24,8 +24,19 @@ class ExponentError:
         return f"Error: Both base and exponent must be numeric values"
 
 class MismatchedParenthesesError:
+    def __init__(self,count,left_or_right):
+        self.count = count
+        self.left_or_right = left_or_right
+
     def __repr__(self):
-        return 'Error: Mismatched parentheses'
+        return f" Error: Missing {self.count} '{self.left_or_right}' character(s)"
+
+class MismatchedBracketsError:
+    def __init__(self,left_or_right):
+        self.left_or_right = left_or_right
+
+    def __repr__(self):
+        return f" Error: Missing '{self.left_or_right}' character(s)"
 
 ##### VARIABLES #####
 
@@ -62,8 +73,26 @@ class InvalidVariableAssignmentError:
     def __repr__(self):
         return f"Error: Invalid variable assignment or usage"
 
+class ConstantsVariableError:
+    def __repr__(self):
+        return 'Error: Constants cannot be reassigned'
+
 ##### OTHER #####
+
+class InvalidComparisonError:
+    def __init__(self, comp_name):
+        self.comp_name = comp_name
+
+    def __repr__(self):
+        return f'Error: "{self.comp_name}" is not a valid comparison operator'
 
 class DelSyntaxError:
     def __repr__(self):
         return 'Error: "del" must be followed by variable to be deleted'
+
+class InvalidSyntaxError:
+    def __init__(self,reason):
+        self.reason = reason
+
+    def __repr__(self):
+        return f'Error: {self.reason}'
