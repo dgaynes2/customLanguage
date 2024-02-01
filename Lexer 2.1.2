@@ -26,10 +26,33 @@ class Lexer:
             n += 1
         return n
 
-    def skip_spaces(self):
-        # continue increasing index while no char found
-        while self.current_char in Categories.BLANKS:
-            self.next()
+    def make__tokens(self):
+        tokens = []
+
+        while self.current_char:
+            # ignore blanks
+            if self.current_char in Categories.BLANKS:
+                self.next()
+            # numbers 1 2 3 4 5 6 7 8 9 0 .
+            elif self.current_char in Categories.DIGITS + '.' + '-':
+                if self.current_char == '-':
+                    if self.peek() in Categories.DIGITS + '.':
+                        self.next()
+                        tokens.append(self.make_number(True))
+                    else:
+                        tokens.append(Tokens.OperatorToken('SUB','-'))
+                        self.next()
+                elif self.current_char in Categories.DIGITS + '.':
+                    tokens.append(self.make_number())
+                    # self.next()
+            # EOF
+            elif self.current_char == 'EOF':
+                break
+            # unknown character
+            else:
+                return f'Error: unknown character, {self.current_char}'
+
+        return tokens
 
     def make_tokens(self):
         tokens = []
@@ -38,10 +61,22 @@ class Lexer:
             # ignore blanks
             if self.current_char in Categories.BLANKS:
                 self.next()
-            # numbers 0 1 2 3 4 5 6 7 8 9 .
-            elif self.current_char in Categories.DIGITS + '.':
-                tokens.append(self.make_number())
-            # operators
+            # numbers 1 2 3 4 5 6 7 8 9 0 .
+            elif self.current_char in Categories.DIGITS + '.' + '-':
+                if self.current_char == '-':
+                    if self.peek() in Categories.DIGITS + '.':
+                        self.next()
+                        tokens.append(self.make_number(True))
+                    else:
+                        tokens.append(Tokens.OperatorToken('SUB','-'))
+                        self.next()
+                elif self.current_char in Categories.DIGITS + '.':
+                    tokens.append(self.make_number())
+                    # self.next()
+            # words (keywords, constants, variables)
+            elif self.current_char in Categories.LETTERS:
+                tokens.append(Tokens.Token(*self.make_word()))
+            # operators + - * ** / // ///
             elif self.current_char in Categories.OPERATORS:
                 tokens.append(Tokens.OperatorToken(*self.make_operator()))
             # brackets ( ) [ ]
@@ -51,30 +86,12 @@ class Lexer:
             # comparatives > >= < <= = !=
             elif self.current_char in '><!=':
                 tokens.append(Tokens.ComparativeToken(*self.make_comparative()))
-            # words
-            elif self.current_char in Categories.LETTERS:
-                tokens.append(Tokens.Token(*self.make_word()))
-
             # EOF
             elif self.current_char == 'EOF':
                 break
-
             # unknown character
             else:
                 return f'Error: unknown character, {self.current_char}'
-
-        # I hate this. How to incorporate
-        for token in tokens:
-            if isinstance(token,Tokens.OperatorToken):
-                if tokens[tokens.index(token)+1]:
-                    n = tokens[tokens.index(token)+1]
-                    if isinstance(n,Tokens.OperatorToken) and n.type == 'SUB':
-                        if tokens[tokens.index(token)+2]:
-                            m = tokens[tokens.index(token)+2]
-                            if isinstance(m,Tokens.IntegerToken) or isinstance(m,Tokens.FloatToken):
-                                m.value = '-' + m.value
-                                tokens.remove(n)
-
 
         return tokens
 
@@ -83,75 +100,78 @@ class Lexer:
         decimal_count = 1 if self.current_char == '.' else 0
         self.next()
 
-        while self.current_char and self.current_char in Categories.DIGITS + '.':
+        while self.current_char in Categories.DIGITS + '.':
             if self.current_char == '.':
                 if decimal_count == 1:
-                    return 'Error: too many decimals'
+                    return 'Error: Too many decimals'
                 decimal_count += 1
             num_str += self.current_char
             self.next()
 
-        # 0 before leading decimal
+        # no leading decimals
         if num_str.startswith('.'):
             num_str = '0' + num_str
 
-        # 0 after ending decimal
+        # no trailing decimals
         if num_str.endswith('.'):
             num_str += '0'
 
-        # remove extra leading 0's
+        # no leading zeroes
         if decimal_count == 0:
             if num_str.startswith('0'):
                 while num_str.startswith('0'):
                     num_str = num_str[1:]
 
+        # add - if negative
         if negative:
             num_str = '-' + num_str
         return Tokens.FloatToken(num_str) if decimal_count else Tokens.IntegerToken(num_str)
-
-    def make_word(self):
-        word_str = self.current_char
-        self.next()
-
-        while self.current_char and self.current_char in Categories.LETTERS + '_':
-            word_str += self.current_char
-            self.next()
-
-        return 'KEY' if word_str in Categories.KEYWORDS else 'MATH' if word_str in Categories.MATH else 'VAR', word_str
 
     def make_operator(self):
         # + - / *
         op_str = self.current_char
 
-        if self.peek():
-            if self.peek(self.get_next_char()) == '-':
-                self.next()
-                return 'SUB','-'
-
-            # // **
-            elif self.peek() and self.peek() == op_str[-1]:
+        if self.peek(self.get_next_char()) in Categories.DIGITS + '.':
+            self.next()
+            return self.make_number()
+        # ** //
+        elif self.peek() == op_str[-1]:
+            self.next()
+            op_str += self.current_char
+            # ///
+            if self.peek() == op_str[-1]:
                 self.next()
                 op_str += self.current_char
-                # ///
-                if self.peek():
-                    if self.peek() and self.peek() == op_str[-1]:
-                        self.next()
-                        op_str += self.current_char
-            self.next()
+        self.next()
         return Categories.OPERATORS[op_str], op_str
+
+    def make_word(self):
+        word_str = self.current_char
+        self.next()
+
+        while self.current_char in Categories.LETTERS + '_':
+            word_str += self.current_char
+            self.next()
+
+        return 'KEY' if word_str in Categories.KEYWORDS else 'MATH' if word_str in Categories.MATH else 'VAR', word_str
 
     def make_comparative(self):
         comp_str = self.current_char
-        self.next()
 
-        if self.current_char == '=':
-            comp_str += self.current_char
+        if comp_str in {'>','<','!'}:
+            # ! error
+            if comp_str == '!' and self.peek() != '=':
+                return 'Error: "!" needs a following "="'
+            # >= <= !=
+            if self.peek(look_for='='):
+                self.next()
+                comp_str += self.current_char
+            self.next()
+        elif comp_str == '=':
             self.next()
 
-        if comp_str == '!':
-            return 'Error: "!" needs a following "="'
-
         return Categories.COMPARATIVES[comp_str], comp_str
+
 
 def token_test():
     to_test = {
@@ -165,7 +185,8 @@ def token_test():
         # 'a':'test[(2 * 3)-1 >= 1.44 ** 3][2 + 2][3 + 3]',
         # 'b':'test[(2 * 3)- 1 >= 1.44 ** 3][2 + 2][3 + 3]',
         # 'c':'test[(2 * 3)--1 >= 1.44 ** 3][2 + 2][3 + 3]',
-        # 'test':'1-1--1 - 1- 1'
+        # 'test':'1- 1--1 - 1- 1',
+        # 'd':'2>-1',
     }
     for _set_ in to_test:
         to_show = f"| {_set_}{' '*(5-len(_set_))}: "
@@ -175,4 +196,6 @@ def token_test():
             to_show += f"{i.type}:{i.value}, "
         to_show = to_show.strip(', ') # remove final comma
         print(to_show)
-# token_test()
+token_test()
+
+# TODO: - 1 -> sub 1 but -1 -> neg 1. How to fix?
